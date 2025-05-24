@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aviator Simulador com Som</title>
+  <style>
+    :root {
+      --bg-dark: #0a1a2b;
+      --text-light: #e0e6f1;
+      --accent: #ff9f1c;
+      --accent-dark: #e88e1c;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, red, orange, yellow, green, blue, indigo, violet);
+      background-size: 400% 400%;
+      animation: rainbow 15s ease infinite;
+      color: var(--text-light);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      overflow-x: hidden;
+    }
+    @keyframes rainbow {
+      0% {background-position: 0% 50%;}
+      50% {background-position: 100% 50%;}
+      100% {background-position: 0% 50%;}
+    }
+    #game {
+      max-width: 450px;
+      margin: 2rem auto 4rem;
+      background: #000000cc;
+      padding: 1.5rem 2rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px #00000088;
+    }
+    h1 {
+      margin-bottom: 0.2rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+    }
+    #credits {
+      font-weight: 700;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+    #aviator {
+      font-size: 3.5rem;
+      font-weight: 900;
+      margin: 1rem 0 0.8rem;
+      background: linear-gradient(90deg, red, orange, yellow, green, blue, violet);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+      position: relative;
+      height: 80px;
+    }
+    #plane {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 60px;
+      height: 60px;
+      transition: transform 0.1s ease-out;
+      filter: drop-shadow(0 0 3px #ffa726);
+    }
+    input[type=number] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      outline: none;
+    }
+    button {
+      background: var(--accent);
+      border: none;
+      padding: 12px 22px;
+      margin: 0 8px 1rem;
+      color: #0a1a2b;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: var(--accent-dark);
+    }
+    .log {
+      height: 140px;
+      background: #0a1a2bcc;
+      border-radius: 12px;
+      overflow-y: auto;
+      padding: 10px;
+      font-size: 0.9rem;
+      text-align: left;
+      color: #eee;
+    }
+    .ranking {
+      margin-top: 1.5rem;
+      background: #142850cc;
+      border-radius: 12px;
+      padding: 1rem;
+      max-width: 350px;
+      margin-left: auto;
+      margin-right: auto;
+      color: #ddd;
+    }
+    .ranking h3 {
+      margin-bottom: 0.8rem;
+      font-weight: 700;
+    }
+    .ranking ul {
+      list-style-type: none;
+      padding-left: 0;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    .ranking li {
+      padding: 4px 0;
+      border-bottom: 1px solid #2a3a5b;
+    }
+  </style>
+</head>
+<body>
+
+<div id="game">
+  <h1>Aviator Simulador</h1>
+  <p>Créditos: <span id="credits">10000</span></p>
+  <div style="position:relative;">
+    <span id="aviator">x1.00</span>
+    <svg id="plane" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#ffa726" d="M2 30 L50 12 L54 14 L20 32 L54 50 L50 52 L2 34z"/>
+      <circle fill="#fff" cx="12" cy="30" r="5"/>
+    </svg>
+  </div>
+  <input type="number" id="betAmount" placeholder="Valor da aposta" min="1" />
+  <div>
+    <button onclick="startGame()">Apostar</button>
+    <button onclick="cashOut()">Sacar</button>
+    <button onclick="ativarSom()">🔊 Ativar Som</button>
+  </div>
+  <div class="log" id="log"></div>
+  <div class="ranking">
+    <h3>🏆 Histórico</h3>
+    <ul id="history"></ul>
+  </div>
+</div>
+
+<!-- Sons -->
+<audio id="bgMusic" loop autoplay muted>
+  <source src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_9cc575d02d.mp3?filename=motivational-inspiring-corporate-ambient-11652.mp3" type="audio/mpeg" />
+</audio>
+<audio id="betSound" src="https://cdn.pixabay.com/download/audio/2022/03/21/audio_7cc73b25c3.mp3?filename=button-click-2.mp3"></audio>
+<audio id="cashSound" src="https://cdn.pixabay.com/download/audio/2022/03/23/audio_0b69e6c664.mp3?filename=coins-collect-02.mp3"></audio>
+<audio id="crashSound" src="https://cdn.pixabay.com/download/audio/2022/03/22/audio_5bde7cc77a.mp3?filename=game-over-arcade-6435.mp3"></audio>
+
+<script>
+let multiplier = 1.00;
+let interval;
+let inGame = false;
+let crashed = false;
+let credits = 10000;
+let bet = 0;
+let history = [];
+
+const plane = document.getElementById('plane');
+const aviatorText = document.getElementById('aviator');
+const creditsText = document.getElementById('credits');
+const log = document.getElementById('log');
+const historyList = document.getElementById('history');
+const bgMusic = document.getElementById('bgMusic');
+const betSound = document.getElementById('betSound');
+const cashSound = document.getElementById('cashSound');
+const crashSound = document.getElementById('crashSound');
+
+function ativarSom() {
+  bgMusic.muted = false;
+  bgMusic.volume = 0.3;
+  bgMusic.play().catch(err => {
+    alert("Clique permitido para ativar o som!");
+  });
+}
+
+function playSound(sound) {
+  sound.currentTime = 0;
+  sound.play();
+}
+
+function updateCredits() {
+  creditsText.textContent = credits;
+}
+
+function logMessage(msg) {
+  log.innerHTML = msg + '<br>' + log.innerHTML;
+}
+
+function updateHistory(entry) {
+  history.unshift(entry);
+  if (history.length > 10) history.pop();
+  historyList.innerHTML = history.map(h => `<li>${h}</li>`).join('');
+}
+
+function startGame() {
+  if (inGame) return;
+  bet = parseInt(document.getElementById('betAmount').value);
+  if (!bet || bet <= 0 || bet > credits) {
+    alert("Aposta inválida");
+    return;
+  }
+
+  ativarSom();
+  playSound(betSound);
+  credits -= bet;
+  updateCredits();
+
+  multiplier = 1.00;
+  crashed = false;
+  inGame = true;
+  aviatorText.textContent = 'x1.00';
+  plane.style.transform = 'translateY(50px) rotate(10deg)';
+
+  interval = setInterval(() => {
+    multiplier += 0.02;
+    aviatorText.textContent = 'x' + multiplier.toFixed(2);
+    let translateY = 50 - multiplier * 15;
+    let rotate = 10 - multiplier * 5;
+    plane.style.transform = `translateY(${translateY}px) rotate(${rotate}deg)`;
+
+    if (Math.random() < (0.004 * multiplier)) {
+      crash();
+    }
+  }, 100);
+}
+
+function crash() {
+  clearInterval(interval);
+  inGame = false;
+  crashed = true;
+  playSound(crashSound);
+  logMessage(`🚨 Crashou em x${multiplier.toFixed(2)}! Você perdeu ${bet} créditos.`);
+  updateHistory(`Crash: x${multiplier.toFixed(2)} ❌`);
+  plane.style.transform = 'translateY(60px) rotate(-45deg)';
+}
+
+function cashOut() {
+  if (!inGame || crashed) return;
+  clearInterval(interval);
+  let ganho = bet * multiplier;
+  credits += Math.floor(ganho);
+  updateCredits();
+  playSound(cashSound);
+  logMessage(`✅ Sacou em x${multiplier.toFixed(2)}! Ganhou ${Math.floor(ganho)} créditos.`);
+  updateHistory(`Saque: x${multiplier.toFixed(2)} ✅`);
+  inGame = false;
+}
+</script>
+
+</body>
+</html>
